@@ -33,8 +33,8 @@ func main() {
 	var cfg config
 	flag.IntVar(&cfg.port, "port", 4000, "API server port")
 	flag.StringVar(&cfg.env, "env", "development", "Environment (development|staging|production)")
-
-	flag.StringVar(&cfg.db.dsn, "db-dsn", "postgres://postgres:40593319@localhost/greenlight?sslmode=disable", "PostgreSQL DSN")
+	//"postgres://postgres:40593319@localhost/greenlight?sslmode=disable"
+	flag.StringVar(&cfg.db.dsn, "db-dsn", os.Getenv("DSN"), "PostgreSQL DSN")
 	flag.Parse()
 	logger := log.New(os.Stdout, "", log.Ldate|log.Ltime)
 	db, err := openDB(cfg)
