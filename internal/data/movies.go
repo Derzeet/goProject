@@ -22,29 +22,36 @@ type MovieModel struct {
 	DB *sql.DB
 }
 
-// func (m MovieModel) GetAll() {
-// 	query := `SELECT * from movies`
-// 	query2 := `select count(distinct(id)) from movies`
-// 	number := m.DB.QueryRow(query2).Scan()
-// 	var movies []Movie
-// 	lol := m.DB.QueryRow(query)
-// 	for i := 1; i <= number; i++ {
-// 		err := lol.Scan(
-// 			&movies[i].ID,
-// 			&movies[i].CreatedAt,
-// 			&movies[i].Title,
-// 			&movies[i].Year,
-// 			&movies[i].Runtime,
-// 			pq.Array(&movies[i].Genres),
-// 			&movies[i].Version,
-// 		)
-// 		if err != nil {
-// 			continue
-// 		}
-// 	}
-
-// 	return &movies, nil
-// }
+func (m MovieModel) GetAll() *[]Movie {
+	query := "SELECT * from movies"
+	query2 := `select count(distinct(id)) from movies`
+	var count int32
+	m.DB.QueryRow(query2).Scan(&count)
+	var movies []Movie
+	res, err := m.DB.Query(query)
+	if err != nil {
+		// handle this error better than this
+		panic(err)
+	}
+	defer res.Close()
+	for res.Next() {
+		var movie Movie
+		err := res.Scan(
+			&movie.ID,
+			&movie.CreatedAt,
+			&movie.Title,
+			&movie.Year,
+			&movie.Runtime,
+			pq.Array(&movie.Genres),
+			&movie.Version,
+		)
+		movies = append(movies, movie)
+		if err != nil {
+			panic(err)
+		}
+	}
+	return &movies
+}
 
 func (m MovieModel) Insert(movie *Movie) error {
 	query := `

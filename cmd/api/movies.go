@@ -11,6 +11,9 @@ import (
 // Add a showMovieHandler for the "GET /v1/movies/:id" endpoint. For now, we retrieve
 // the interpolated "id" parameter from the current URL and include it in a placeholder
 // response.
+func (app *application) listMoviesHandler(w http.ResponseWriter, r *http.Request) {
+	app.models.Movies.GetAll()
+}
 func (app *application) showMovieHandler(w http.ResponseWriter, r *http.Request) {
 	id, err := app.readIDParam(r)
 	if err != nil {
