@@ -8,12 +8,18 @@ import (
 	"assOneGo.derzeet.net/internal/data"
 )
 
-// Add a showMovieHandler for the "GET /v1/movies/:id" endpoint. For now, we retrieve
-// the interpolated "id" parameter from the current URL and include it in a placeholder
-// response.
 func (app *application) listMoviesHandler(w http.ResponseWriter, r *http.Request) {
-	app.models.Movies.GetAll()
+	movies := app.models.Movies.GetAll()
+	if len(*movies) == 0 {
+		app.dataBaseEmptyResponse(w, r)
+		return
+	}
+	err := app.writeJSON(w, http.StatusOK, envelope{"movies": movies}, nil)
+	if err != nil {
+		app.serverErrorResponse(w, r, err)
+	}
 }
+
 func (app *application) showMovieHandler(w http.ResponseWriter, r *http.Request) {
 	id, err := app.readIDParam(r)
 	if err != nil {

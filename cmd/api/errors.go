@@ -54,3 +54,7 @@ func (app *application) methodNotAllowedResponse(w http.ResponseWriter, r *http.
 func (app *application) badRequestResponse(w http.ResponseWriter, r *http.Request, err error) {
 	app.errorResponse(w, r, http.StatusBadRequest, err.Error())
 }
+func (app *application) dataBaseEmptyResponse(w http.ResponseWriter, r *http.Request) {
+	message := "current database is empty"
+	app.errorResponse(w, r, http.StatusBadRequest, message)
+}
