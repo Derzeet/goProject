@@ -1,8 +1,10 @@
 package data
 
 import (
+	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/lib/pq"
@@ -22,21 +24,96 @@ type MovieModel struct {
 	DB *sql.DB
 }
 
-func (m MovieModel) GetAll() *[]Movie {
-	query := "SELECT * from movies"
-	query2 := `select count(distinct(id)) from movies`
-	var count int32
-	m.DB.QueryRow(query2).Scan(&count)
-	var movies []Movie
-	res, err := m.DB.Query(query)
-	if err != nil {
-		// handle this error better than this
-		panic(err)
+// func (m MovieModel) GetAll() *[]Movie {
+// 	query := "SELECT * from movies"
+// 	query2 := `select count(distinct(id)) from movies`
+// 	var count int32
+// 	m.DB.QueryRow(query2).Scan(&count)
+// 	var movies []Movie
+// 	res, err := m.DB.Query(query)
+// 	if err != nil {
+// 		// handle this error better than this
+// 		panic(err)
+// 	}
+// 	defer res.Close()
+// 	for res.Next() {
+// 		var movie Movie
+// 		err := res.Scan(
+// 			&movie.ID,
+// 			&movie.CreatedAt,
+// 			&movie.Title,
+// 			&movie.Year,
+// 			&movie.Runtime,
+// 			pq.Array(&movie.Genres),
+// 			&movie.Version,
+// 		)
+// 		movies = append(movies, movie)
+// 		if err != nil {
+// 			panic(err)
+// 		}
+// 	}
+// 	return &movies
+// }
+
+func (m MovieModel) Update(movie *Movie) error {
+	// Add the 'AND version = $6' clause to the SQL query.
+	query := `
+	UPDATE movies
+	SET title = $1, year = $2, runtime = $3, genres = $4, version = version + 1
+	WHERE id = $5 AND version = $6
+	RETURNING version`
+	args := []any{
+		movie.Title,
+		movie.Year,
+		movie.Runtime,
+		pq.Array(movie.Genres),
+		movie.ID,
+		movie.Version, // Add the expected movie version.
 	}
-	defer res.Close()
-	for res.Next() {
+	// Execute the SQL query. If no matching row could be found, we know the movie
+	// version has changed (or the record has been deleted) and we return our custom
+	// ErrEditConflict error.
+	err := m.DB.QueryRow(query, args...).Scan(&movie.Version)
+	if err != nil {
+		switch {
+		case errors.Is(err, sql.ErrNoRows):
+			return ErrEditConflict
+		default:
+			return err
+		}
+	}
+	return nil
+}
+
+func (m MovieModel) GetAll(title string, genres []string, filters Filters) ([]*Movie, error) {
+
+	query := fmt.Sprintf(`
+	SELECT id, created_at, title, year, runtime, genres, version
+	FROM movies
+	WHERE (to_tsvector('simple', title) @@ plainto_tsquery('simple', $1) OR $1 = '')
+	AND (genres @> $2 OR $2 = '{}')
+	ORDER BY %s %s, id ASC
+	LIMIT $3 OFFSET $4`, filters.sortColumn(), filters.sortDirection())
+	// Create a context with a 3-second timeout.
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	args := []any{title, pq.Array(genres), filters.limit(), filters.offset()}
+
+	rows, err := m.DB.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+
+	defer rows.Close()
+
+	movies := []*Movie{}
+
+	for rows.Next() {
+		// Initialize an empty Movie struct to hold the data for an individual movie.
 		var movie Movie
-		err := res.Scan(
+
+		err := rows.Scan(
 			&movie.ID,
 			&movie.CreatedAt,
 			&movie.Title,
@@ -45,12 +122,18 @@ func (m MovieModel) GetAll() *[]Movie {
 			pq.Array(&movie.Genres),
 			&movie.Version,
 		)
-		movies = append(movies, movie)
 		if err != nil {
-			panic(err)
+			return nil, err
 		}
+
+		movies = append(movies, &movie)
 	}
-	return &movies
+
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return movies, nil
 }
 
 func (m MovieModel) Insert(movie *Movie) error {
@@ -85,27 +168,27 @@ func (m MovieModel) Get(id int64) (*Movie, error) {
 			return nil, err
 		}
 	}
-	// Otherwise, return a pointer to the Movie struct.
+
 	return &movie, nil
 }
 
-func (m MovieModel) Update(movie *Movie) error {
-	query := `UPDATE movies
-	SET title = $1, year = $2, runtime = $3, genres = $4, version = version + 1
-	WHERE id = $5
-	RETURNING version`
+// func (m MovieModel) Update(movie *Movie) error {
+// 	query := `UPDATE movies
+// 	SET title = $1, year = $2, runtime = $3, genres = $4, version = version + 1
+// 	WHERE id = $5
+// 	RETURNING version`
 
-	args := []any{
-		movie.Title,
-		movie.Year,
-		movie.Runtime,
-		pq.Array(movie.Genres),
-		movie.ID,
-	}
-	// Use the QueryRow() method to execute the query, passing in the args slice as a
-	// variadic parameter and scanning the new version value into the movie struct.
-	return m.DB.QueryRow(query, args...).Scan(&movie.Version)
-}
+//		args := []any{
+//			movie.Title,
+//			movie.Year,
+//			movie.Runtime,
+//			pq.Array(movie.Genres),
+//			movie.ID,
+//		}
+//		// Use the QueryRow() method to execute the query, passing in the args slice as a
+//		// variadic parameter and scanning the new version value into the movie struct.
+//		return m.DB.QueryRow(query, args...).Scan(&movie.Version)
+//	}
 func (m MovieModel) Delete(id int64) error {
 	if id < 1 {
 		return ErrRecordNotFound
