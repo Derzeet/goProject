@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 
@@ -37,55 +38,38 @@ func (app *application) createDirectorHandler(w http.ResponseWriter, r *http.Req
 		app.serverErrorResponse(w, r, err)
 	}
 }
-
-// func (app *application) searchByNameHandler(w http.ResponseWriter, r *http.Request) {
-// 	qs := r.URL.Query()
-// 	name := app.readString(qs, "name", "")
-
-// 	director, err := app.models.Directors.(name)
-// 	if err != nil {
-// 		switch {
-// 		case errors.Is(err, data.ErrRecordNotFound):
-// 			app.notFoundResponse(w, r)
-// 		default:
-// 			app.serverErrorResponse(w, r, err)
-// 		}
-// 		return
-// 	}
-// 	err = app.writeJSON(w, http.StatusOK, envelope{"director": director}, nil)
-// 	if err != nil {
-// 		app.serverErrorResponse(w, r, err)
-// 	}
-
-// }
-
-func (app *application) listDirectorsHandler(w http.ResponseWriter, r *http.Request) {
-	var input struct {
-		Name     string
-		Surname  string
-		Awards   []string
-		FullName string
-		data.Filters
-	}
+func (app *application) showDirector(w http.ResponseWriter, r *http.Request) {
 	qs := r.URL.Query()
-	input.Name = app.readString(qs, "name", "")
-	input.Surname = app.readString(qs, "surname", "")
-	input.Awards = app.readCSV(qs, "awards", []string{})
-	input.FullName = app.readString(qs, "fullname", "")
-	input.Filters.Page = app.readInt(qs, "page", 1)
-	input.Filters.PageSize = app.readInt(qs, "page_size", 20)
-	input.Filters.Sort = app.readString(qs, "sort", "id")
-	input.Filters.SortSafelist = []string{"id", "name", "surname", "-id", "-name", "-awards", "awards", "-surname", "-runtime"}
+	name := app.readString(qs, "name", "")
 
-	// Call the GetAll() method to retrieve the movies, passing in the various filter // parameters.
-	directors, err := app.models.Directors.GetAllDirectors(input.Name, input.Surname, input.Awards, input.Filters, input.FullName)
+	director, err := app.models.Directors.GetByName(name)
+	if err != nil {
+		switch {
+		case errors.Is(err, data.ErrRecordNotFound):
+			app.notFoundResponse(w, r)
+		default:
+			app.serverErrorResponse(w, r, err)
+		}
+	}
+
+	err = app.writeJSON(w, http.StatusOK, envelope{"director": director}, nil)
 	if err != nil {
 		app.serverErrorResponse(w, r, err)
-		return
 	}
-	// Send a JSON response containing the movie data.
-	err = app.writeJSON(w, http.StatusOK, envelope{"director": directors}, nil)
+}
+
+func (app *application) showByAny(w http.ResponseWriter, r *http.Request) {
+	qs := r.URL.Query()
+	award := app.readString(qs, "award", "")
+	name := app.readString(qs, "name", "")
+	surname := app.readString(qs, "surname", "")
+	directors, err := app.models.Directors.GetUniv(name, surname, award)
+	if err != nil {
+		panic(err)
+	}
+	err = app.writeJSON(w, http.StatusOK, envelope{"directors": directors}, nil)
 	if err != nil {
 		app.serverErrorResponse(w, r, err)
 	}
+
 }
