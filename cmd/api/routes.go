@@ -22,6 +22,9 @@ func (app *application) routes() *httprouter.Router {
 
 	router.HandlerFunc(http.MethodPost, "/v1/directors", app.createDirectorHandler)
 	router.HandlerFunc(http.MethodGet, "/v1/directors", app.showByAny)
+
+	router.HandlerFunc(http.MethodPost, "/v1/trailers", app.createTrailerHandler)
+	router.HandlerFunc(http.MethodGet, "/v1/trailers", app.searchTrailers)
 	// router.HandlerFunc(http.MethodGet, "/v1/directors", app.listDirectorsHandler)
 	// router.HandlerFunc(http.MethodPost, "/v1/actors", app.createActorHandler)
 	// router.HandlerFunc(http.MethodGet, "/v1/actors/:id", app.showActorHandler)

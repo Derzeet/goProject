@@ -14,11 +14,13 @@ type Models struct {
 	Movies MovieModel
 	// Actors ActorModel
 	Directors DirectorModel
+	Trailers  TrailerModel
 }
 
 func NewModels(db *sql.DB) Models {
 	return Models{
 		Movies:    MovieModel{DB: db},
 		Directors: DirectorModel{DB: db},
+		Trailers:  TrailerModel{DB: db},
 	}
 }
